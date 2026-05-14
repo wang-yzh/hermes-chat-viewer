@@ -9,6 +9,8 @@ Local reader for Hermes session transcripts. It indexes the default profile plus
 - 默认中文 UI，可在页面里切换 English。
 - 自动读取 `/Users/qlqwpy/.hermes/sessions` 和 `/Users/qlqwpy/.hermes/profiles/*/sessions`。
 - 支持按 profile、角色、关键词过滤。
+- 左侧边栏可折叠，适合长时间阅读。
+- 标题形如 `主题 #1`、`主题 #2` 的连续会话会自动收进同一个组，顶部显示最新，展开后可从早期记录开始读。
 - 工具调用和工具返回会被拆成可读卡片。
 - 默认隐藏已经被后续 handoff / resume 链路包含的旧记录，可手动取消。
 - 提供退出按钮，点击后会关闭本地 Python 服务，不常驻后台。
