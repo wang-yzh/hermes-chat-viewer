@@ -14,8 +14,21 @@ Local reader for Hermes session transcripts. It indexes the default profile plus
 - 工具调用和工具返回会被拆成可读卡片。
 - 默认隐藏已经被后续 handoff / resume 链路包含的旧记录，可手动取消。
 - 提供退出按钮，点击后会关闭本地 Python 服务，不常驻后台。
+- 可打包成 macOS 菜单栏 App：打开时不弹 Terminal，菜单栏提供 Open Viewer / Restart Server / Quit。
 
 ## 运行 / Run
+
+推荐方式：构建 macOS App。
+
+```bash
+cd /Users/qlqwpy/Documents/游乐园/hermes-chat-viewer
+./scripts/build-macos-app.sh
+open "dist/Hermes Chat Viewer.app"
+```
+
+打开后菜单栏会出现 `⚕` 图标。Quit 会停止本地 viewer 服务。
+
+也可以继续使用旧的 `.command`：
 
 macOS 下双击：
 
