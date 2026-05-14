@@ -1,0 +1,1021 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hermes Chat Viewer</title>
+  <style>
+    :root {
+      --bg: #f5efe3;
+      --panel: rgba(255, 251, 241, .82);
+      --ink: #211d18;
+      --muted: #756b5e;
+      --line: #ddcfbb;
+      --user: #f2c966;
+      --assistant: #dcebc8;
+      --tool: #d9e8f2;
+      --system: #eadcf2;
+      --call: #f8e7bd;
+      --bad: #a94131;
+      --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      --serif: ui-serif, "Songti SC", "Noto Serif CJK SC", Georgia, serif;
+      --sans: ui-sans-serif, "PingFang SC", "Noto Sans CJK SC", system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 16% -10%, rgba(242, 201, 102, .34), transparent 34rem),
+        radial-gradient(circle at 95% 0%, rgba(94, 138, 112, .23), transparent 32rem),
+        linear-gradient(135deg, #fbf1dc, #f3eadf 48%, #ebe5db);
+      font-family: var(--serif);
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: 380px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    aside {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 22px;
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: auto auto auto minmax(0, 1fr);
+      gap: 14px;
+      border-right: 1px solid var(--line);
+      background: rgba(255, 250, 240, .76);
+      backdrop-filter: blur(16px);
+    }
+
+    main {
+      min-width: 0;
+      padding: 28px clamp(18px, 4vw, 58px) 70px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 30px;
+      letter-spacing: -.04em;
+    }
+
+    .sub {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .controls {
+      display: grid;
+      gap: 9px;
+    }
+
+    .lang-switch {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255, 253, 247, .7);
+    }
+
+    .lang-switch button {
+      padding: 7px 9px;
+      border-radius: 10px;
+      border-color: transparent;
+      background: transparent;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .lang-switch button.active {
+      background: #282119;
+      color: #fff7e8;
+    }
+
+    input, select, button {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      padding: 10px 12px;
+      color: var(--ink);
+      background: #fffdf7;
+      font-family: var(--sans);
+      font-size: 14px;
+    }
+
+    button {
+      cursor: pointer;
+      background: #282119;
+      color: #fff7e8;
+      border-color: #282119;
+      font-weight: 700;
+    }
+
+    button.secondary {
+      background: #fffdf7;
+      color: var(--ink);
+      border-color: var(--line);
+    }
+
+    button.danger {
+      background: #fff2ed;
+      color: var(--bad);
+      border-color: rgba(169, 65, 49, .28);
+    }
+
+    .stats {
+      padding: 12px 13px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, .52);
+      color: var(--muted);
+      font: 13px/1.5 var(--sans);
+    }
+
+    .check-row {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: rgba(255, 253, 247, .68);
+      color: var(--muted);
+      font: 12px/1.35 var(--sans);
+    }
+
+    .check-row input {
+      width: auto;
+      margin: 0;
+    }
+
+    .session-list {
+      overflow: auto;
+      padding-right: 3px;
+      display: grid;
+      align-content: start;
+      gap: 8px;
+    }
+
+    .session {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 11px 12px;
+      background: rgba(255, 255, 255, .56);
+      cursor: pointer;
+      transition: .15s ease;
+      display: grid;
+      grid-template-rows: auto auto auto;
+      gap: 6px;
+    }
+
+    .session:hover { transform: translateY(-1px); background: rgba(255, 255, 255, .84); }
+    .session.active { background: #2b241b; color: #fff7e8; border-color: #2b241b; }
+    .session.active .session-meta, .session.active .preview, .session.active .badge { color: rgba(255, 247, 232, .72); border-color: rgba(255, 247, 232, .25); }
+
+    .session-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: baseline;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .session-title {
+      font: 700 14px/1.3 var(--sans);
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+
+    .badge {
+      justify-self: end;
+      padding: 3px 6px;
+      border-radius: 999px;
+      border: 1px solid rgba(0,0,0,.08);
+      color: var(--muted);
+      font: 700 10px/1 var(--sans);
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .session-meta, .preview {
+      color: var(--muted);
+      font: 12px/1.35 var(--sans);
+      overflow: hidden;
+    }
+
+    .session-meta {
+      display: grid;
+      grid-template-columns: 64px 1fr auto;
+      gap: 8px;
+      align-items: center;
+      white-space: nowrap;
+    }
+
+    .session-meta span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .preview {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .hero {
+      max-width: 900px;
+      margin: 12vh auto 0;
+      padding: 46px;
+      border-radius: 30px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      box-shadow: 0 22px 54px rgba(52, 37, 18, .14);
+    }
+
+    .hero h2 {
+      margin: 0 0 14px;
+      font-size: clamp(36px, 6vw, 76px);
+      line-height: .92;
+      letter-spacing: -.07em;
+    }
+
+    .hero p {
+      margin: 0;
+      max-width: 680px;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.7;
+    }
+
+    .conversation {
+      max-width: 1050px;
+      margin: 0 auto;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 4;
+      margin: -28px 0 22px;
+      padding: 22px 0 16px;
+      background: linear-gradient(to bottom, rgba(245, 239, 227, .98), rgba(245, 239, 227, .82), transparent);
+      backdrop-filter: blur(10px);
+    }
+
+    .topbar h2 {
+      margin: 0;
+      font-size: clamp(25px, 3vw, 42px);
+      letter-spacing: -.045em;
+    }
+
+    .topbar .sub {
+      word-break: break-all;
+      font-family: var(--sans);
+    }
+
+    .msg {
+      display: grid;
+      grid-template-columns: 118px minmax(0, 1fr);
+      gap: 14px;
+      margin: 15px 0;
+      animation: rise .22s ease both;
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(7px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .role {
+      justify-self: end;
+      align-self: start;
+      min-width: 84px;
+      text-align: center;
+      padding: 7px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(0,0,0,.08);
+      font: 800 12px/1 var(--sans);
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    .bubble {
+      min-width: 0;
+      padding: 15px 17px;
+      border-radius: 20px;
+      border: 1px solid rgba(0,0,0,.08);
+      box-shadow: 0 8px 24px rgba(52, 37, 18, .07);
+      background: #fffaf0;
+    }
+
+    .msg.user .role, .msg.user .bubble { background: var(--user); }
+    .msg.assistant .role, .msg.assistant .bubble { background: var(--assistant); }
+    .msg.tool .role, .msg.tool .bubble { background: var(--tool); }
+    .msg.system .role, .msg.system .bubble { background: var(--system); }
+    .msg.tool-call .role, .msg.tool-call .bubble { background: var(--call); }
+
+    .content {
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.66;
+    }
+
+    pre {
+      overflow: auto;
+      padding: 13px;
+      border-radius: 13px;
+      background: rgba(27, 23, 18, .92);
+      color: #fff7e8;
+      font: 12.5px/1.55 var(--mono);
+      white-space: pre;
+    }
+
+    details summary {
+      cursor: pointer;
+      font: 800 13px/1.4 var(--sans);
+    }
+
+    .tool-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 10px;
+      margin: 10px 0;
+    }
+
+    .tool-card {
+      padding: 11px;
+      border-radius: 14px;
+      border: 1px solid rgba(0,0,0,.08);
+      background: rgba(255,255,255,.52);
+    }
+
+    .tool-name {
+      font: 800 13px/1.35 var(--sans);
+      margin-bottom: 8px;
+    }
+
+    .kv {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin: 8px 0;
+    }
+
+    .pill {
+      padding: 4px 7px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.58);
+      border: 1px solid rgba(0,0,0,.08);
+      font: 12px/1 var(--sans);
+    }
+
+    .footer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+      color: rgba(35,31,26,.56);
+      font: 12px/1.35 var(--sans);
+    }
+
+    .empty, .error {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255,255,255,.55);
+      color: var(--muted);
+      font-family: var(--sans);
+    }
+
+    .error { color: var(--bad); }
+    .hidden { display: none !important; }
+
+    @media (max-width: 860px) {
+      .shell { grid-template-columns: 1fr; }
+      aside {
+        position: relative;
+        height: 58vh;
+        border-right: none;
+        border-bottom: 1px solid var(--line);
+      }
+      .msg { grid-template-columns: 1fr; }
+      .role { justify-self: start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside>
+      <header>
+        <h1>Hermes Chat Viewer</h1>
+        <p class="sub" data-i18n="subtitle">自动索引 `~/.hermes/sessions` 和各 profile 的 sessions。点击左侧会话即可阅读。</p>
+      </header>
+
+      <div class="controls">
+        <div class="lang-switch" role="group" aria-label="Language">
+          <button id="langZh" type="button" data-lang="zh">中文</button>
+          <button id="langEn" type="button" data-lang="en">English</button>
+        </div>
+        <input id="query" type="search" placeholder="搜索标题 / ID / 预览 / 正文" data-i18n-placeholder="searchPlaceholder">
+        <select id="profile">
+          <option value="all">全部 profile</option>
+        </select>
+        <select id="role">
+          <option value="all">全部角色</option>
+          <option value="user">只看 user</option>
+          <option value="assistant">只看 assistant</option>
+          <option value="tool-call">只看工具调用</option>
+          <option value="tool">只看工具结果</option>
+          <option value="system">只看 system</option>
+        </select>
+        <button id="refresh" type="button" data-i18n="refresh">刷新索引</button>
+        <button id="collapseTools" class="secondary" type="button" data-i18n="toggleTools">折叠/展开工具详情</button>
+        <label class="check-row">
+          <input id="hideSuperseded" type="checkbox" checked>
+          <span data-i18n="hideSuperseded">忽略已被后续对话包含的旧记录</span>
+        </label>
+        <button id="quit" class="danger" type="button" data-i18n="quit">退出 Viewer</button>
+      </div>
+
+      <div id="stats" class="stats" data-i18n="loadingIndex">正在读取索引...</div>
+      <div id="sessionList" class="session-list"></div>
+    </aside>
+
+    <main>
+      <section id="welcome" class="hero">
+        <h2 data-i18n="heroTitle">本地聊天档案馆。</h2>
+        <p data-i18n="heroBody">这个版本不需要拖文件。它由本地 Python 服务读取 Hermes 的聊天目录，然后在这里渲染成对话视图。工具调用会被拆成可读卡片。</p>
+      </section>
+      <section id="conversation" class="conversation hidden"></section>
+    </main>
+  </div>
+
+  <script>
+    const i18n = {
+      zh: {
+        subtitle: "自动索引 `~/.hermes/sessions` 和各 profile 的 sessions。点击左侧会话即可阅读。",
+        searchPlaceholder: "搜索标题 / ID / 预览 / 正文",
+        allProfile: "全部 profile",
+        roleAll: "全部角色",
+        roleUser: "只看 user",
+        roleAssistant: "只看 assistant",
+        roleToolCall: "只看工具调用",
+        roleTool: "只看工具结果",
+        roleSystem: "只看 system",
+        refresh: "刷新索引",
+        toggleTools: "折叠/展开工具详情",
+        hideSuperseded: "忽略已被后续对话包含的旧记录",
+        quit: "退出 Viewer",
+        loadingIndex: "正在读取索引...",
+        indexed: "已索引 {count} 个文件，{profiles} 个 profile。",
+        showing: "显示 {visible} / {total} 个文件；已隐藏 {hidden} 个旧链路记录。",
+        supersededBy: "已被 {id} 包含 · {preview}",
+        noSessions: "没有匹配的会话。",
+        loadingSession: "正在载入 {profile}/{file} ...",
+        currentSession: "当前：{profile}/{file}，{count} 条消息。",
+        messageCount: "{count} 条",
+        unknown: "unknown",
+        unknownModel: "unknown model",
+        unknownPlatform: "unknown platform",
+        heroTitle: "本地聊天档案馆。",
+        heroBody: "这个版本不需要拖文件。它由本地 Python 服务读取 Hermes 的聊天目录，然后在这里渲染成对话视图。工具调用会被拆成可读卡片。",
+        noMessages: "没有匹配的消息。",
+        empty: "(empty)",
+        callTool: "调用工具：{name}",
+        rawArgs: "原始参数 JSON",
+        arguments: "arguments",
+        toolResult: "工具返回{suffix}",
+        fullJson: "完整返回 JSON",
+        toolCalls: "tool calls",
+        shutdownConfirm: "退出 Hermes Chat Viewer？本地服务会停止，页面随后不可刷新。",
+        shutdownTitle: "Viewer 已退出。",
+        shutdownBody: "本地服务已经停止。可以直接关闭这个标签页和 Terminal 窗口；下次双击 .command 再启动。"
+      },
+      en: {
+        subtitle: "Automatically indexes `~/.hermes/sessions` and profile sessions. Select a session on the left to read it.",
+        searchPlaceholder: "Search title / ID / preview / body",
+        allProfile: "All profiles",
+        roleAll: "All roles",
+        roleUser: "User only",
+        roleAssistant: "Assistant only",
+        roleToolCall: "Tool calls only",
+        roleTool: "Tool results only",
+        roleSystem: "System only",
+        refresh: "Refresh index",
+        toggleTools: "Collapse / expand tool details",
+        hideSuperseded: "Hide old records already included by later sessions",
+        quit: "Quit Viewer",
+        loadingIndex: "Reading index...",
+        indexed: "Indexed {count} files across {profiles} profiles.",
+        showing: "Showing {visible} / {total} files; hidden superseded records: {hidden}.",
+        supersededBy: "Included by {id} · {preview}",
+        noSessions: "No matching sessions.",
+        loadingSession: "Loading {profile}/{file} ...",
+        currentSession: "Current: {profile}/{file}, {count} messages.",
+        messageCount: "{count} msgs",
+        unknown: "unknown",
+        unknownModel: "unknown model",
+        unknownPlatform: "unknown platform",
+        heroTitle: "Your local chat archive.",
+        heroBody: "No drag-and-drop needed. A local Python server reads Hermes session directories and renders them here as conversations. Tool calls are split into readable cards.",
+        noMessages: "No matching messages.",
+        empty: "(empty)",
+        callTool: "Tool call: {name}",
+        rawArgs: "Raw arguments JSON",
+        arguments: "arguments",
+        toolResult: "Tool result{suffix}",
+        fullJson: "Full result JSON",
+        toolCalls: "tool calls",
+        shutdownConfirm: "Quit Hermes Chat Viewer? The local server will stop, and this page will no longer refresh.",
+        shutdownTitle: "Viewer has quit.",
+        shutdownBody: "The local server has stopped. You can close this tab and the Terminal window; double-click the .command file next time to start again."
+      }
+    };
+
+    const state = {
+      index: [],
+      profiles: [],
+      active: null,
+      session: null,
+      lang: localStorage.getItem("hcv.lang") || "zh",
+      query: "",
+      profile: "all",
+      role: "all",
+      collapseTools: true,
+      hideSuperseded: true
+    };
+
+    const $ = id => document.getElementById(id);
+    const els = {
+      query: $("query"),
+      profile: $("profile"),
+      role: $("role"),
+      langZh: $("langZh"),
+      langEn: $("langEn"),
+      refresh: $("refresh"),
+      collapseTools: $("collapseTools"),
+      hideSuperseded: $("hideSuperseded"),
+      quit: $("quit"),
+      stats: $("stats"),
+      list: $("sessionList"),
+      welcome: $("welcome"),
+      conversation: $("conversation")
+    };
+
+    els.langZh.addEventListener("click", () => setLanguage("zh"));
+    els.langEn.addEventListener("click", () => setLanguage("en"));
+    els.query.addEventListener("input", () => {
+      state.query = els.query.value.trim().toLowerCase();
+      renderList();
+      renderSession();
+    });
+    els.profile.addEventListener("change", () => {
+      state.profile = els.profile.value;
+      renderList();
+    });
+    els.role.addEventListener("change", () => {
+      state.role = els.role.value;
+      renderSession();
+    });
+    els.refresh.addEventListener("click", loadIndex);
+    els.collapseTools.addEventListener("click", () => {
+      state.collapseTools = !state.collapseTools;
+      renderSession();
+    });
+    els.hideSuperseded.addEventListener("change", () => {
+      state.hideSuperseded = els.hideSuperseded.checked;
+      renderList();
+    });
+    els.quit.addEventListener("click", shutdownViewer);
+
+    applyLanguage();
+    loadIndex();
+
+    function tr(key, vars = {}) {
+      const template = i18n[state.lang]?.[key] ?? i18n.zh[key] ?? key;
+      return template.replace(/\{(\w+)\}/g, (_, name) => vars[name] ?? "");
+    }
+
+    function setLanguage(lang) {
+      state.lang = lang === "en" ? "en" : "zh";
+      localStorage.setItem("hcv.lang", state.lang);
+      applyLanguage();
+      renderProfileOptions();
+      if (state.index.length) renderList();
+      renderSession();
+    }
+
+    function applyLanguage() {
+      document.documentElement.lang = state.lang === "zh" ? "zh-CN" : "en";
+      document.querySelectorAll("[data-i18n]").forEach(node => {
+        node.textContent = tr(node.dataset.i18n);
+      });
+      document.querySelectorAll("[data-i18n-placeholder]").forEach(node => {
+        node.placeholder = tr(node.dataset.i18nPlaceholder);
+      });
+      els.langZh.classList.toggle("active", state.lang === "zh");
+      els.langEn.classList.toggle("active", state.lang === "en");
+      els.langZh.setAttribute("aria-pressed", String(state.lang === "zh"));
+      els.langEn.setAttribute("aria-pressed", String(state.lang === "en"));
+      renderRoleOptions();
+    }
+
+    function renderRoleOptions() {
+      const current = state.role || els.role.value || "all";
+      const options = [
+        ["all", tr("roleAll")],
+        ["user", tr("roleUser")],
+        ["assistant", tr("roleAssistant")],
+        ["tool-call", tr("roleToolCall")],
+        ["tool", tr("roleTool")],
+        ["system", tr("roleSystem")]
+      ];
+      els.role.innerHTML = "";
+      for (const [value, label] of options) {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = label;
+        els.role.appendChild(option);
+      }
+      els.role.value = options.some(([value]) => value === current) ? current : "all";
+      state.role = els.role.value;
+    }
+
+    async function loadIndex() {
+      setStats(tr("loadingIndex"));
+      const response = await fetch("/api/sessions");
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      state.index = data.sessions || [];
+      state.profiles = data.profiles || [];
+      renderProfileOptions();
+      renderList();
+      setStats(tr("indexed", { count: state.index.length, profiles: state.profiles.length }));
+    }
+
+    function renderProfileOptions() {
+      const current = els.profile.value || "all";
+      els.profile.innerHTML = "";
+      const allOption = document.createElement("option");
+      allOption.value = "all";
+      allOption.textContent = tr("allProfile");
+      els.profile.appendChild(allOption);
+      for (const profile of state.profiles) {
+        const option = document.createElement("option");
+        option.value = profile;
+        option.textContent = profile;
+        els.profile.appendChild(option);
+      }
+      els.profile.value = state.profiles.includes(current) ? current : "all";
+      state.profile = els.profile.value;
+    }
+
+    function filteredIndex() {
+      return state.index.filter(item => {
+        if (state.hideSuperseded && item.superseded) return false;
+        const profileOk = state.profile === "all" || item.profile === state.profile;
+        const hay = `${item.profile} ${item.file} ${item.session_id} ${item.title} ${item.preview} ${item.model} ${item.platform}`.toLowerCase();
+        const queryOk = !state.query || hay.includes(state.query);
+        return profileOk && queryOk;
+      });
+    }
+
+    function renderList() {
+      const items = filteredIndex();
+      const hiddenCount = state.index.filter(item => item.superseded).length;
+      setStats(tr("showing", { visible: items.length, total: state.index.length, hidden: state.hideSuperseded ? hiddenCount : 0 }));
+      els.list.innerHTML = "";
+      for (const item of items) {
+        const button = document.createElement("div");
+        button.className = "session" + (state.active && state.active.profile === item.profile && state.active.file === item.file ? " active" : "");
+        button.innerHTML = `
+          <div class="session-head">
+            <div class="session-title">${escapeHtml(item.title || item.session_id || item.file)}</div>
+            <div class="badge">${escapeHtml(item.kind)}</div>
+          </div>
+          <div class="session-meta">
+            <span>${escapeHtml(item.profile)}</span>
+            <span>${escapeHtml(item.model || item.platform || tr("unknown"))}</span>
+            <span>${escapeHtml(tr("messageCount", { count: item.message_count || 0 }))}</span>
+          </div>
+          <div class="preview">${escapeHtml(item.superseded ? tr("supersededBy", { id: item.superseded_by, preview: item.preview || item.file }) : (item.preview || item.file))}</div>
+        `;
+        button.addEventListener("click", () => openSession(item));
+        els.list.appendChild(button);
+      }
+      if (!items.length) {
+        els.list.innerHTML = `<div class="empty">${escapeHtml(tr("noSessions"))}</div>`;
+      }
+    }
+
+    async function openSession(item) {
+      state.active = item;
+      renderList();
+      setStats(tr("loadingSession", { profile: item.profile, file: item.file }));
+      const url = `/api/session?profile=${encodeURIComponent(item.profile)}&file=${encodeURIComponent(item.file)}`;
+      const response = await fetch(url);
+      const data = await response.json();
+      if (data.error) {
+        els.conversation.innerHTML = `<div class="error">${escapeHtml(data.error)}</div>`;
+        return;
+      }
+      state.session = normalizeSession(data);
+      setStats(tr("currentSession", { profile: item.profile, file: item.file, count: state.session.messages.length }));
+      renderSession();
+    }
+
+    function normalizeSession(data) {
+      const raw = Array.isArray(data.messages) ? data.messages : [];
+      const messages = [];
+      raw.forEach((message, index) => {
+        const role = normalizeRole(message.role || message.type || message.kind || "unknown");
+        const content = extractContent(message);
+        const base = {
+          key: `${index}`,
+          index,
+          role,
+          content,
+          timestamp: message.timestamp || message.created_at || message.time || "",
+          finish: message.finish_reason || "",
+          raw: message
+        };
+
+        if (role === "assistant" && Array.isArray(message.tool_calls) && message.tool_calls.length) {
+          if (content.trim()) messages.push(base);
+          for (const call of message.tool_calls) {
+            messages.push({
+              key: `${index}-call-${call.id || call.call_id || call.function?.name || messages.length}`,
+              index,
+              role: "tool-call",
+              toolName: call.function?.name || call.name || "tool",
+              toolId: call.id || call.call_id || "",
+              argumentsText: call.function?.arguments || call.arguments || "",
+              timestamp: base.timestamp,
+              raw: call
+            });
+          }
+          return;
+        }
+
+        if (role === "tool") {
+          const parsed = parseMaybeJson(content);
+          messages.push({
+            ...base,
+            toolName: message.tool_name || parsed?.tool_name || "",
+            toolId: message.tool_call_id || "",
+            parsed
+          });
+          return;
+        }
+
+        messages.push(base);
+      });
+
+      return {
+        sessionId: data.session_id || data.id || state.active?.session_id || "",
+        file: data.file || state.active?.file || "",
+        profile: data.profile || state.active?.profile || "",
+        title: data.title || state.active?.title || "",
+        model: data.model || state.active?.model || "",
+        platform: data.platform || state.active?.platform || "",
+        started: data.session_start || data.started_at || "",
+        updated: data.last_updated || data.ended_at || "",
+        messages
+      };
+    }
+
+    function renderSession() {
+      const session = state.session;
+      if (!session) {
+        els.welcome.classList.remove("hidden");
+        els.conversation.classList.add("hidden");
+        return;
+      }
+      els.welcome.classList.add("hidden");
+      els.conversation.classList.remove("hidden");
+      els.conversation.innerHTML = "";
+
+      const header = document.createElement("div");
+      header.className = "topbar";
+      header.innerHTML = `
+        <h2>${escapeHtml(session.title || "Hermes Session")}</h2>
+        <p class="sub">${escapeHtml(session.profile)} · ${escapeHtml(session.sessionId)} · ${escapeHtml(session.model || tr("unknownModel"))} · ${escapeHtml(session.platform || tr("unknownPlatform"))}</p>
+      `;
+      els.conversation.appendChild(header);
+
+      const messages = session.messages.filter(message => {
+        const roleOk = state.role === "all" || message.role === state.role;
+        const hay = `${message.role} ${message.toolName || ""} ${message.content || ""} ${message.argumentsText || ""}`.toLowerCase();
+        const queryOk = !state.query || hay.includes(state.query);
+        return roleOk && queryOk;
+      });
+
+      if (!messages.length) {
+        els.conversation.insertAdjacentHTML("beforeend", `<div class="empty">${escapeHtml(tr("noMessages"))}</div>`);
+        return;
+      }
+
+      const fragment = document.createDocumentFragment();
+      for (const message of messages) fragment.appendChild(renderMessage(message));
+      els.conversation.appendChild(fragment);
+    }
+
+    function renderMessage(message) {
+      const article = document.createElement("article");
+      article.className = `msg ${message.role}`;
+      article.innerHTML = `<div class="role">${escapeHtml(roleLabel(message.role))}</div>`;
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+
+      if (message.role === "tool-call") {
+        bubble.appendChild(renderToolCall(message));
+      } else if (message.role === "tool") {
+        bubble.appendChild(renderToolResult(message));
+      } else {
+        const content = document.createElement("div");
+        content.className = "content";
+        content.innerHTML = renderContent(message.content || tr("empty"));
+        bubble.appendChild(content);
+      }
+
+      const footer = document.createElement("div");
+      footer.className = "footer";
+      footer.innerHTML = [
+        `#${message.index + 1}`,
+        message.timestamp ? formatTime(message.timestamp) : "",
+        message.finish ? `finish: ${message.finish}` : "",
+        message.toolId ? `id: ${message.toolId}` : ""
+      ].filter(Boolean).map(escapeHtml).join("<span>·</span>");
+      bubble.appendChild(footer);
+      article.appendChild(bubble);
+      return article;
+    }
+
+    function renderToolCall(message) {
+      const details = document.createElement("details");
+      details.open = !state.collapseTools;
+      details.innerHTML = `<summary>${escapeHtml(tr("callTool", { name: message.toolName }))}</summary>`;
+      const args = parseMaybeJson(message.argumentsText);
+      const card = document.createElement("div");
+      card.className = "tool-card";
+      card.innerHTML = `
+        <div class="tool-name">${escapeHtml(message.toolName)}</div>
+        ${args ? renderToolArguments(args) : `<pre>${escapeHtml(message.argumentsText || JSON.stringify(message.raw, null, 2))}</pre>`}
+      `;
+      details.appendChild(card);
+      return details;
+    }
+
+    function renderToolArguments(args) {
+      if (!args || typeof args !== "object") return `<pre>${escapeHtml(String(args))}</pre>`;
+      const quick = [];
+      for (const key of ["cmd", "command", "path", "url", "query", "pattern", "workdir", "timeout"]) {
+        if (args[key] !== undefined) quick.push(`<span class="pill">${escapeHtml(key)}: ${escapeHtml(short(args[key], 90))}</span>`);
+      }
+      const code = args.code ? `<details ${state.collapseTools ? "" : "open"}><summary>code</summary><pre>${escapeHtml(args.code)}</pre></details>` : "";
+      return `
+        <div class="kv">${quick.join("") || `<span class="pill">${escapeHtml(tr("arguments"))}</span>`}</div>
+        ${code}
+        <details><summary>${escapeHtml(tr("rawArgs"))}</summary><pre>${escapeHtml(JSON.stringify(args, null, 2))}</pre></details>
+      `;
+    }
+
+    function renderToolResult(message) {
+      const parsed = message.parsed;
+      const details = document.createElement("details");
+      details.open = !state.collapseTools;
+      const suffix = message.toolName ? `${state.lang === "zh" ? "：" : ": "}${message.toolName}` : "";
+      details.innerHTML = `<summary>${escapeHtml(tr("toolResult", { suffix }))}</summary>`;
+      const card = document.createElement("div");
+      card.className = "tool-card";
+      if (parsed && typeof parsed === "object") {
+        const output = parsed.output || parsed.stdout || parsed.stderr || parsed.result || parsed.error || "";
+        card.innerHTML = `
+          <div class="kv">
+            ${parsed.status ? `<span class="pill">status: ${escapeHtml(parsed.status)}</span>` : ""}
+            ${parsed.duration_seconds !== undefined ? `<span class="pill">${escapeHtml(parsed.duration_seconds)}s</span>` : ""}
+            ${parsed.tool_calls_made !== undefined ? `<span class="pill">${escapeHtml(tr("toolCalls"))}: ${escapeHtml(parsed.tool_calls_made)}</span>` : ""}
+          </div>
+          ${output ? `<pre>${escapeHtml(String(output))}</pre>` : `<pre>${escapeHtml(JSON.stringify(parsed, null, 2))}</pre>`}
+          <details><summary>${escapeHtml(tr("fullJson"))}</summary><pre>${escapeHtml(JSON.stringify(parsed, null, 2))}</pre></details>
+        `;
+      } else {
+        card.innerHTML = `<pre>${escapeHtml(message.content || "")}</pre>`;
+      }
+      details.appendChild(card);
+      return details;
+    }
+
+    function extractContent(message) {
+      for (const key of ["content", "text", "output", "result", "error", "reasoning"]) {
+        const value = message[key];
+        if (typeof value === "string") return value;
+        if (Array.isArray(value)) return value.map(partToText).filter(Boolean).join("\n");
+        if (value && typeof value === "object") return JSON.stringify(value, null, 2);
+      }
+      return "";
+    }
+
+    function partToText(part) {
+      if (typeof part === "string") return part;
+      if (!part || typeof part !== "object") return "";
+      if (typeof part.text === "string") return part.text;
+      if (typeof part.content === "string") return part.content;
+      return JSON.stringify(part);
+    }
+
+    function parseMaybeJson(value) {
+      if (!value || typeof value !== "string") return null;
+      try { return JSON.parse(value); } catch { return null; }
+    }
+
+    function normalizeRole(role) {
+      const value = String(role).toLowerCase();
+      if (value.includes("assistant")) return "assistant";
+      if (value.includes("user")) return "user";
+      if (value.includes("tool") || value.includes("function")) return "tool";
+      if (value.includes("system")) return "system";
+      return value || "unknown";
+    }
+
+    function roleLabel(role) {
+      return role === "tool-call" ? "call" : role;
+    }
+
+    function renderContent(text) {
+      const escaped = escapeHtml(String(text));
+      const parts = escaped.split(/```/);
+      if (parts.length === 1) return linkify(escaped);
+      return parts.map((part, index) => {
+        if (index % 2) return `<pre>${part.replace(/^\w+\n/, "")}</pre>`;
+        return linkify(part);
+      }).join("");
+    }
+
+    function linkify(text) {
+      return text.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noreferrer">$1</a>');
+    }
+
+    function short(value, len) {
+      const text = typeof value === "string" ? value : JSON.stringify(value);
+      return text.length > len ? `${text.slice(0, len)}...` : text;
+    }
+
+    function formatTime(value) {
+      if (!value) return "";
+      if (typeof value === "number") return new Date(value * 1000).toLocaleString();
+      const parsed = Date.parse(value);
+      return Number.isNaN(parsed) ? String(value) : new Date(parsed).toLocaleString();
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes) return "";
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function setStats(text) {
+      els.stats.textContent = text;
+    }
+
+    async function shutdownViewer() {
+      if (!confirm(tr("shutdownConfirm"))) return;
+      try {
+        await fetch("/api/shutdown");
+      } catch {
+        // The server may close the connection while shutting down.
+      }
+      document.body.innerHTML = `
+        <main style="min-height:100vh;display:grid;place-items:center;padding:32px;font-family:var(--serif);">
+          <section class="hero" style="margin:0;">
+            <h2>${escapeHtml(tr("shutdownTitle"))}</h2>
+            <p>${escapeHtml(tr("shutdownBody"))}</p>
+          </section>
+        </main>
+      `;
+    }
+  </script>
+</body>
+</html>
