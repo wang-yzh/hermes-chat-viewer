@@ -12,7 +12,8 @@ Local reader for Hermes session transcripts. It indexes the default profile plus
 - 左侧边栏可折叠，适合长时间阅读。
 - 标题形如 `主题 #1`、`主题 #2` 的连续会话会自动收进同一个组，顶部显示最新，展开后可从早期记录开始读。
 - 工具调用和工具返回会被拆成可读卡片。
-- 默认隐藏已经被后续 handoff / resume 链路包含的旧记录，可手动取消。
+- 默认隐藏明显的测试 / 空对话，可手动取消。
+- 分组会把无编号的同名会话当作 `#1` 收进去，展开顺序为新到旧。
 - 提供退出按钮，点击后会关闭本地 Python 服务，不常驻后台。
 - 可打包成 macOS 菜单栏 App：打开时不弹 Terminal，菜单栏提供 Open Viewer / Restart Server / Quit。
 
@@ -27,6 +28,12 @@ open "dist/Hermes Chat Viewer.app"
 ```
 
 打开后菜单栏会出现 `⚕` 图标。Quit 会停止本地 viewer 服务。
+
+如果 App 打不开或服务没起来，可从菜单栏选择 `Show Logs`，日志位置：
+
+```text
+~/Library/Logs/Hermes Chat Viewer/server.log
+```
 
 也可以继续使用旧的 `.command`：
 

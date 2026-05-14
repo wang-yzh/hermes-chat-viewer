@@ -541,8 +541,8 @@
         <button id="refresh" type="button" data-i18n="refresh">刷新索引</button>
         <button id="collapseTools" class="secondary" type="button" data-i18n="toggleTools">折叠/展开工具详情</button>
         <label class="check-row">
-          <input id="hideSuperseded" type="checkbox" checked>
-          <span data-i18n="hideSuperseded">忽略已被后续对话包含的旧记录</span>
+          <input id="hideNoise" type="checkbox" checked>
+          <span data-i18n="hideNoise">忽略无意义对话</span>
         </label>
         <button id="quit" class="danger wide" type="button" data-i18n="quit">退出 Viewer</button>
       </div>
@@ -576,11 +576,11 @@
         toggleTools: "折叠/展开工具详情",
         collapseSidebar: "折叠边栏",
         expandSidebar: "展开边栏",
-        hideSuperseded: "忽略已被后续对话包含的旧记录",
+        hideNoise: "忽略无意义对话",
         quit: "退出 Viewer",
         loadingIndex: "正在读取索引...",
         indexed: "已索引 {count} 个文件，{profiles} 个 profile。",
-        showing: "显示 {visible} / {total} 个入口；已隐藏 {hidden} 个旧链路记录。",
+        showing: "显示 {visible} / {total} 个入口；已隐藏 {hidden} 个无意义对话。",
         supersededBy: "已被 {id} 包含 · {preview}",
         groupCount: "{count} 条链路",
         expandGroup: "展开 {count}",
@@ -620,11 +620,11 @@
         toggleTools: "Collapse / expand tool details",
         collapseSidebar: "Collapse sidebar",
         expandSidebar: "Expand sidebar",
-        hideSuperseded: "Hide old records already included by later sessions",
+        hideNoise: "Hide low-value test chats",
         quit: "Quit Viewer",
         loadingIndex: "Reading index...",
         indexed: "Indexed {count} files across {profiles} profiles.",
-        showing: "Showing {visible} / {total} entries; hidden superseded records: {hidden}.",
+        showing: "Showing {visible} / {total} entries; hidden low-value chats: {hidden}.",
         supersededBy: "Included by {id} · {preview}",
         groupCount: "{count} linked sessions",
         expandGroup: "Expand {count}",
@@ -664,7 +664,7 @@
       profile: "all",
       role: "all",
       collapseTools: true,
-      hideSuperseded: true
+      hideNoise: true
     };
 
     const $ = id => document.getElementById(id);
@@ -678,7 +678,7 @@
       langEn: $("langEn"),
       refresh: $("refresh"),
       collapseTools: $("collapseTools"),
-      hideSuperseded: $("hideSuperseded"),
+      hideNoise: $("hideNoise"),
       quit: $("quit"),
       stats: $("stats"),
       list: $("sessionList"),
@@ -711,8 +711,8 @@
       state.collapseTools = !state.collapseTools;
       renderSession();
     });
-    els.hideSuperseded.addEventListener("change", () => {
-      state.hideSuperseded = els.hideSuperseded.checked;
+    els.hideNoise.addEventListener("change", () => {
+      state.hideNoise = els.hideNoise.checked;
       renderList();
     });
     els.quit.addEventListener("click", shutdownViewer);
@@ -814,7 +814,7 @@
 
     function filteredIndex() {
       return state.index.filter(item => {
-        if (state.hideSuperseded && item.superseded && !parseNumberedTitle(item.title)) return false;
+        if (state.hideNoise && isNoiseSession(item)) return false;
         const profileOk = state.profile === "all" || item.profile === state.profile;
         const hay = `${item.profile} ${item.file} ${item.session_id} ${item.title} ${item.preview} ${item.model} ${item.platform}`.toLowerCase();
         const queryOk = !state.query || hay.includes(state.query);
@@ -822,10 +822,21 @@
       });
     }
 
+    function isNoiseSession(item) {
+      const title = String(item.title || "").trim();
+      const preview = String(item.preview || "").trim();
+      const file = String(item.file || "");
+      if (file.startsWith("request_dump_") && (item.message_count || 0) <= 6) return true;
+      if (!title && (item.message_count || 0) <= 4) return true;
+      if (!title && preview.startsWith("# Hermes Agent Persona")) return true;
+      return false;
+    }
+
     function renderList() {
-      const items = groupedIndex(filteredIndex());
-      const hiddenCount = state.index.filter(item => item.superseded).length;
-      setStats(tr("showing", { visible: items.length, total: state.index.length, hidden: state.hideSuperseded ? hiddenCount : 0 }));
+      const visibleSource = filteredIndex();
+      const items = groupedIndex(visibleSource);
+      const hiddenCount = state.hideNoise ? state.index.filter(isNoiseSession).length : 0;
+      setStats(tr("showing", { visible: items.length, total: state.index.length, hidden: hiddenCount }));
       els.list.innerHTML = "";
       for (const entry of items) els.list.appendChild(renderSessionEntry(entry));
       if (!items.length) {
@@ -836,8 +847,13 @@
     function groupedIndex(items) {
       const groups = new Map();
       const singles = [];
+      const numberedBases = new Map();
       for (const item of items) {
         const numbered = parseNumberedTitle(item.title);
+        if (numbered) numberedBases.set(`${item.profile}::${numbered.base}`, true);
+      }
+      for (const item of items) {
+        const numbered = parseNumberedTitle(item.title) || inferFirstInNumberedGroup(item, numberedBases);
         if (!numbered) {
           singles.push({ type: "single", item, sortTime: item.mtime || 0 });
           continue;
@@ -847,7 +863,7 @@
         groups.get(key).items.push({ ...item, sequence: numbered.sequence });
       }
       for (const group of groups.values()) {
-        group.items.sort((a, b) => a.sequence - b.sequence || (a.mtime || 0) - (b.mtime || 0));
+        group.items.sort((a, b) => b.sequence - a.sequence || (b.mtime || 0) - (a.mtime || 0));
         group.latest = group.items.reduce((best, item) => (item.sequence > best.sequence || (item.sequence === best.sequence && (item.mtime || 0) > (best.mtime || 0))) ? item : best, group.items[0]);
         group.sortTime = group.latest.mtime || 0;
         if (group.items.length === 1) singles.push({ type: "single", item: group.items[0], sortTime: group.sortTime });
@@ -860,6 +876,14 @@
       const match = String(title || "").trim().match(/^(.+?)\s+#(\d+)$/);
       if (!match) return null;
       return { base: match[1].trim(), sequence: Number(match[2]) };
+    }
+
+    function inferFirstInNumberedGroup(item, numberedBases) {
+      const title = String(item.title || "").trim();
+      if (!title) return null;
+      const key = `${item.profile}::${title}`;
+      if (!numberedBases.has(key)) return null;
+      return { base: title, sequence: 1 };
     }
 
     function renderSessionEntry(entry) {
