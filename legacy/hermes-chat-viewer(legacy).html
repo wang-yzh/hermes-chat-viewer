@@ -1,0 +1,700 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hermes Chat Viewer</title>
+  <style>
+    :root {
+      --bg: #f4efe6;
+      --panel: #fffaf0;
+      --ink: #231f1a;
+      --muted: #786d5f;
+      --line: #dccdb7;
+      --user: #f5c86a;
+      --assistant: #dfecc9;
+      --tool: #d9e4ef;
+      --system: #eadcf2;
+      --danger: #b14b3a;
+      --shadow: 0 18px 48px rgba(52, 37, 18, .14);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 15% 0%, rgba(245, 200, 106, .28), transparent 32rem),
+        radial-gradient(circle at 90% 10%, rgba(132, 174, 137, .22), transparent 30rem),
+        linear-gradient(135deg, #f8f0df, #f3eadf 40%, #eee7dd);
+      font-family: ui-serif, "Songti SC", "Noto Serif CJK SC", Georgia, serif;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 340px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    aside {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 24px;
+      overflow: auto;
+      border-right: 1px solid var(--line);
+      background: rgba(255, 250, 240, .72);
+      backdrop-filter: blur(14px);
+    }
+
+    main {
+      min-width: 0;
+      padding: 28px clamp(18px, 4vw, 56px) 64px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 28px;
+      letter-spacing: -.03em;
+    }
+
+    .tagline {
+      margin: 0 0 22px;
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 14px;
+    }
+
+    .drop {
+      display: grid;
+      gap: 10px;
+      padding: 18px;
+      border: 1.5px dashed #b79e79;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, .46);
+      transition: .18s ease;
+    }
+
+    .drop.drag {
+      transform: translateY(-1px);
+      border-color: #7f6c47;
+      background: rgba(255, 255, 255, .82);
+    }
+
+    input[type="file"] { width: 100%; }
+
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .control {
+      margin-top: 18px;
+      display: grid;
+      gap: 10px;
+    }
+
+    input[type="search"], select, button {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #fffdf7;
+      color: var(--ink);
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+      background: #2b241b;
+      color: #fffaf0;
+      border-color: #2b241b;
+    }
+
+    button.secondary {
+      background: #fffdf7;
+      color: var(--ink);
+    }
+
+    .meta {
+      margin-top: 20px;
+      padding: 14px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, .55);
+      border: 1px solid var(--line);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .file-list {
+      margin-top: 16px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .file-btn {
+      text-align: left;
+      background: rgba(255, 255, 255, .54);
+      color: var(--ink);
+      border: 1px solid var(--line);
+      font-size: 13px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .file-btn.active {
+      background: #2b241b;
+      color: #fffaf0;
+    }
+
+    .hero {
+      max-width: 880px;
+      margin: 10vh auto 0;
+      padding: 42px;
+      border-radius: 28px;
+      background: rgba(255, 250, 240, .74);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+    }
+
+    .hero h2 {
+      margin: 0 0 10px;
+      font-size: clamp(30px, 5vw, 58px);
+      line-height: .98;
+      letter-spacing: -.06em;
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.6;
+    }
+
+    .conversation {
+      max-width: 980px;
+      margin: 0 auto;
+    }
+
+    .session-title {
+      position: sticky;
+      top: 0;
+      z-index: 4;
+      margin: -28px 0 24px;
+      padding: 22px 0 14px;
+      background: linear-gradient(to bottom, rgba(244, 239, 230, .96), rgba(244, 239, 230, .80), transparent);
+      backdrop-filter: blur(10px);
+    }
+
+    .session-title h2 {
+      margin: 0;
+      font-size: clamp(24px, 3vw, 38px);
+      letter-spacing: -.04em;
+    }
+
+    .session-title .sub {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      word-break: break-all;
+    }
+
+    .msg {
+      display: grid;
+      grid-template-columns: 120px minmax(0, 1fr);
+      gap: 14px;
+      margin: 14px 0;
+      animation: rise .28s ease both;
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .role {
+      justify-self: end;
+      align-self: start;
+      min-width: 86px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      border: 1px solid rgba(0, 0, 0, .08);
+    }
+
+    .bubble {
+      min-width: 0;
+      padding: 16px 18px;
+      border-radius: 20px;
+      background: var(--panel);
+      border: 1px solid rgba(0, 0, 0, .08);
+      box-shadow: 0 8px 24px rgba(52, 37, 18, .08);
+    }
+
+    .msg.user .role, .msg.user .bubble { background: var(--user); }
+    .msg.assistant .role, .msg.assistant .bubble { background: var(--assistant); }
+    .msg.tool .role, .msg.tool .bubble { background: var(--tool); }
+    .msg.system .role, .msg.system .bubble { background: var(--system); }
+
+    .content {
+      white-space: pre-wrap;
+      line-height: 1.66;
+      word-break: break-word;
+    }
+
+    .content pre {
+      overflow: auto;
+      white-space: pre;
+      padding: 14px;
+      border-radius: 14px;
+      background: rgba(27, 23, 18, .9);
+      color: #fff7e6;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: 13px;
+    }
+
+    .msg-footer {
+      margin-top: 10px;
+      color: rgba(35, 31, 26, .56);
+      font-size: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    details.tool-details summary {
+      cursor: pointer;
+      color: #31556f;
+      font-weight: 700;
+    }
+
+    .hidden { display: none !important; }
+
+    .empty {
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255,255,255,.55);
+      color: var(--muted);
+    }
+
+    .error {
+      color: var(--danger);
+      font-size: 13px;
+      margin-top: 10px;
+      white-space: pre-wrap;
+    }
+
+    @media (max-width: 840px) {
+      .app { grid-template-columns: 1fr; }
+      aside {
+        position: relative;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--line);
+      }
+      .msg { grid-template-columns: 1fr; }
+      .role { justify-self: start; }
+      .session-title { margin-top: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside>
+      <h1>Hermes Chat Viewer</h1>
+      <p class="tagline">把 Hermes 的 session JSON / JSONL 渲染成更像聊天窗口的视图。所有解析都在本机浏览器完成。</p>
+
+      <label id="drop" class="drop">
+        <strong>选择或拖入 session 文件</strong>
+        <input id="fileInput" type="file" multiple accept=".json,.jsonl,application/json">
+        <span class="hint">支持 `session_*.json` 和 `*.jsonl`。浏览器安全限制下，不能自动扫描目录，需要手动选择文件。</span>
+      </label>
+
+      <div class="control">
+        <input id="search" type="search" placeholder="搜索消息内容...">
+        <select id="roleFilter">
+          <option value="all">显示全部角色</option>
+          <option value="user">只看 user</option>
+          <option value="assistant">只看 assistant</option>
+          <option value="tool">只看 tool</option>
+          <option value="system">只看 system</option>
+        </select>
+        <button id="toggleTools" class="secondary" type="button">折叠/展开工具消息</button>
+        <button id="exportMarkdown" type="button">导出当前会话为 Markdown</button>
+      </div>
+
+      <div id="meta" class="meta">还没有载入文件。</div>
+      <div id="error" class="error"></div>
+      <div id="fileList" class="file-list"></div>
+    </aside>
+
+    <main>
+      <section id="welcome" class="hero">
+        <h2>把流水账变回对话。</h2>
+        <p>左侧选择 Hermes 的聊天记录文件。你可以从 `Documents/hermes-default-sessions` 或 `Documents/hermes-life-sessions` 里拖文件进来。</p>
+      </section>
+      <section id="conversation" class="conversation hidden"></section>
+    </main>
+  </div>
+
+  <script>
+    const state = {
+      sessions: [],
+      activeIndex: -1,
+      collapseTools: true,
+      query: "",
+      role: "all"
+    };
+
+    const els = {
+      drop: document.getElementById("drop"),
+      fileInput: document.getElementById("fileInput"),
+      fileList: document.getElementById("fileList"),
+      meta: document.getElementById("meta"),
+      error: document.getElementById("error"),
+      search: document.getElementById("search"),
+      roleFilter: document.getElementById("roleFilter"),
+      toggleTools: document.getElementById("toggleTools"),
+      exportMarkdown: document.getElementById("exportMarkdown"),
+      welcome: document.getElementById("welcome"),
+      conversation: document.getElementById("conversation")
+    };
+
+    els.fileInput.addEventListener("change", event => loadFiles([...event.target.files]));
+    els.search.addEventListener("input", event => {
+      state.query = event.target.value.trim().toLowerCase();
+      renderActive();
+    });
+    els.roleFilter.addEventListener("change", event => {
+      state.role = event.target.value;
+      renderActive();
+    });
+    els.toggleTools.addEventListener("click", () => {
+      state.collapseTools = !state.collapseTools;
+      renderActive();
+    });
+    els.exportMarkdown.addEventListener("click", exportMarkdown);
+
+    ["dragenter", "dragover"].forEach(type => {
+      els.drop.addEventListener(type, event => {
+        event.preventDefault();
+        els.drop.classList.add("drag");
+      });
+    });
+    ["dragleave", "drop"].forEach(type => {
+      els.drop.addEventListener(type, event => {
+        event.preventDefault();
+        els.drop.classList.remove("drag");
+      });
+    });
+    els.drop.addEventListener("drop", event => loadFiles([...event.dataTransfer.files]));
+
+    async function loadFiles(files) {
+      els.error.textContent = "";
+      const candidates = files.filter(file => /\.(jsonl?|JSONL?)$/.test(file.name));
+      if (!candidates.length) {
+        els.error.textContent = "没有找到 .json 或 .jsonl 文件。";
+        return;
+      }
+
+      const parsed = [];
+      for (const file of candidates) {
+        try {
+          const text = await file.text();
+          parsed.push(parseSessionFile(file.name, text));
+        } catch (err) {
+          els.error.textContent += `读取失败：${file.name}\n${err.message}\n`;
+        }
+      }
+
+      state.sessions = parsed.sort((a, b) => (b.lastUpdated || "").localeCompare(a.lastUpdated || ""));
+      state.activeIndex = state.sessions.length ? 0 : -1;
+      renderFileList();
+      renderActive();
+    }
+
+    function parseSessionFile(name, text) {
+      const trimmed = text.trim();
+      if (!trimmed) throw new Error("空文件");
+
+      if (name.toLowerCase().endsWith(".jsonl")) {
+        const messages = trimmed.split(/\r?\n/)
+          .filter(Boolean)
+          .map((line, index) => normalizeMessage(JSON.parse(line), index))
+          .filter(Boolean);
+        return sessionFromMessages({ fileName: name, messages });
+      }
+
+      const data = JSON.parse(trimmed);
+      const rawMessages = Array.isArray(data)
+        ? data
+        : Array.isArray(data.messages)
+          ? data.messages
+          : Array.isArray(data.conversation)
+            ? data.conversation
+            : [];
+
+      const messages = rawMessages
+        .map((message, index) => normalizeMessage(message, index))
+        .filter(Boolean);
+
+      return sessionFromMessages({
+        fileName: name,
+        sessionId: data.session_id || data.id || inferSessionId(name),
+        title: data.title || data.name || "",
+        model: data.model || "",
+        platform: data.platform || data.source || "",
+        startedAt: data.session_start || data.started_at || "",
+        lastUpdated: data.last_updated || data.ended_at || "",
+        messages
+      });
+    }
+
+    function sessionFromMessages(input) {
+      const messages = input.messages || [];
+      const timestamps = messages.map(m => m.timestamp).filter(Boolean).sort();
+      return {
+        fileName: input.fileName,
+        sessionId: input.sessionId || inferSessionId(input.fileName),
+        title: input.title || "",
+        model: input.model || "",
+        platform: input.platform || "",
+        startedAt: input.startedAt || timestamps[0] || "",
+        lastUpdated: input.lastUpdated || timestamps[timestamps.length - 1] || "",
+        messages
+      };
+    }
+
+    function normalizeMessage(message, index) {
+      if (!message || typeof message !== "object") return null;
+      const role = normalizeRole(message.role || message.type || message.kind || "unknown");
+      const content = extractContent(message);
+      const toolName = message.tool_name || message.name || message.function?.name || "";
+      const timestamp = message.timestamp || message.created_at || message.time || "";
+      const finishReason = message.finish_reason || "";
+      return { index, role, content, toolName, timestamp, finishReason, raw: message };
+    }
+
+    function extractContent(message) {
+      const candidates = [
+        message.content,
+        message.text,
+        message.output,
+        message.result,
+        message.error,
+        message.reasoning
+      ];
+      for (const value of candidates) {
+        if (typeof value === "string" && value.trim()) return value;
+        if (Array.isArray(value)) return value.map(partToText).filter(Boolean).join("\n");
+        if (value && typeof value === "object") return JSON.stringify(value, null, 2);
+      }
+      if (message.tool_calls) return JSON.stringify(message.tool_calls, null, 2);
+      return "";
+    }
+
+    function partToText(part) {
+      if (typeof part === "string") return part;
+      if (!part || typeof part !== "object") return "";
+      if (typeof part.text === "string") return part.text;
+      if (typeof part.content === "string") return part.content;
+      if (part.type === "image_url") return `[image] ${part.image_url?.url || ""}`;
+      return JSON.stringify(part);
+    }
+
+    function normalizeRole(role) {
+      const value = String(role).toLowerCase();
+      if (value.includes("assistant")) return "assistant";
+      if (value.includes("user")) return "user";
+      if (value.includes("tool") || value.includes("function")) return "tool";
+      if (value.includes("system")) return "system";
+      return value || "unknown";
+    }
+
+    function inferSessionId(name) {
+      const match = name.match(/(\d{8}_\d{6}_[a-f0-9]+)/i);
+      return match ? match[1] : name.replace(/^session_/, "").replace(/\.(jsonl?|JSONL?)$/, "");
+    }
+
+    function renderFileList() {
+      els.fileList.innerHTML = "";
+      state.sessions.forEach((session, index) => {
+        const button = document.createElement("button");
+        button.className = "file-btn" + (index === state.activeIndex ? " active" : "");
+        button.type = "button";
+        button.textContent = `${session.title || session.sessionId || session.fileName} · ${session.messages.length}`;
+        button.title = session.fileName;
+        button.addEventListener("click", () => {
+          state.activeIndex = index;
+          renderFileList();
+          renderActive();
+        });
+        els.fileList.appendChild(button);
+      });
+    }
+
+    function renderActive() {
+      const session = state.sessions[state.activeIndex];
+      if (!session) {
+        els.welcome.classList.remove("hidden");
+        els.conversation.classList.add("hidden");
+        return;
+      }
+
+      els.welcome.classList.add("hidden");
+      els.conversation.classList.remove("hidden");
+
+      const filtered = session.messages.filter(message => {
+        const roleOk = state.role === "all" || message.role === state.role;
+        const text = `${message.role} ${message.toolName} ${message.content}`.toLowerCase();
+        const queryOk = !state.query || text.includes(state.query);
+        return roleOk && queryOk;
+      });
+
+      els.meta.innerHTML = `
+        <strong>${escapeHtml(session.title || session.sessionId || session.fileName)}</strong><br>
+        文件：${escapeHtml(session.fileName)}<br>
+        消息：${session.messages.length} 条，当前显示 ${filtered.length} 条<br>
+        模型：${escapeHtml(session.model || "未知")}<br>
+        平台：${escapeHtml(session.platform || "未知")}<br>
+        时间：${escapeHtml(formatTime(session.startedAt))} → ${escapeHtml(formatTime(session.lastUpdated))}
+      `;
+
+      els.conversation.innerHTML = "";
+      const header = document.createElement("div");
+      header.className = "session-title";
+      header.innerHTML = `
+        <h2>${escapeHtml(session.title || "Hermes Session")}</h2>
+        <div class="sub">${escapeHtml(session.sessionId || session.fileName)}</div>
+      `;
+      els.conversation.appendChild(header);
+
+      if (!filtered.length) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "没有匹配的消息。";
+        els.conversation.appendChild(empty);
+        return;
+      }
+
+      const fragment = document.createDocumentFragment();
+      filtered.forEach(message => fragment.appendChild(renderMessage(message)));
+      els.conversation.appendChild(fragment);
+    }
+
+    function renderMessage(message) {
+      const item = document.createElement("article");
+      item.className = `msg ${message.role}`;
+
+      const role = document.createElement("div");
+      role.className = "role";
+      role.textContent = message.role;
+
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+
+      if (message.role === "tool") {
+        const details = document.createElement("details");
+        details.className = "tool-details";
+        details.open = !state.collapseTools;
+        const summary = document.createElement("summary");
+        summary.textContent = message.toolName ? `工具：${message.toolName}` : "工具消息";
+        details.appendChild(summary);
+        const content = document.createElement("div");
+        content.className = "content";
+        content.innerHTML = renderContent(message.content || JSON.stringify(message.raw, null, 2));
+        details.appendChild(content);
+        bubble.appendChild(details);
+      } else {
+        const content = document.createElement("div");
+        content.className = "content";
+        content.innerHTML = renderContent(message.content || "(empty)");
+        bubble.appendChild(content);
+      }
+
+      const footer = document.createElement("div");
+      footer.className = "msg-footer";
+      footer.innerHTML = [
+        `#${message.index + 1}`,
+        message.timestamp ? formatTime(message.timestamp) : "",
+        message.finishReason ? `finish: ${message.finishReason}` : "",
+        message.toolName && message.role !== "tool" ? `tool: ${message.toolName}` : ""
+      ].filter(Boolean).map(escapeHtml).join("<span>·</span>");
+      bubble.appendChild(footer);
+
+      item.appendChild(role);
+      item.appendChild(bubble);
+      return item;
+    }
+
+    function renderContent(text) {
+      const escaped = escapeHtml(String(text));
+      const parts = escaped.split(/```/);
+      if (parts.length === 1) return linkify(escaped);
+      return parts.map((part, index) => {
+        if (index % 2 === 1) return `<pre>${part.replace(/^\w+\n/, "")}</pre>`;
+        return linkify(part);
+      }).join("");
+    }
+
+    function linkify(text) {
+      return text.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noreferrer">$1</a>');
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function formatTime(value) {
+      if (!value) return "";
+      if (typeof value === "number") return new Date(value * 1000).toLocaleString();
+      const parsed = Date.parse(value);
+      return Number.isNaN(parsed) ? String(value) : new Date(parsed).toLocaleString();
+    }
+
+    function exportMarkdown() {
+      const session = state.sessions[state.activeIndex];
+      if (!session) return;
+      const lines = [
+        `# ${session.title || session.sessionId || session.fileName}`,
+        "",
+        `- Session: ${session.sessionId || ""}`,
+        `- File: ${session.fileName}`,
+        `- Model: ${session.model || ""}`,
+        `- Platform: ${session.platform || ""}`,
+        "",
+        "---",
+        ""
+      ];
+      for (const message of session.messages) {
+        lines.push(`## ${message.role}${message.toolName ? ` · ${message.toolName}` : ""}`);
+        if (message.timestamp) lines.push(`_${formatTime(message.timestamp)}_`);
+        lines.push("");
+        lines.push(message.content || "(empty)");
+        lines.push("");
+      }
+      const blob = new Blob([lines.join("\n")], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${session.sessionId || "hermes-session"}.md`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>

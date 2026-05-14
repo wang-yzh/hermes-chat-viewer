@@ -15,27 +15,8 @@ Local reader for Hermes session transcripts. It indexes the default profile plus
 - 默认隐藏明显的测试 / 空对话，可手动取消。
 - 分组会把无编号的同名会话当作 `#1` 收进去，展开顺序为新到旧。
 - 提供退出按钮，点击后会关闭本地 Python 服务，不常驻后台。
-- 可打包成 macOS 菜单栏 App：打开时不弹 Terminal，菜单栏提供 Open Viewer / Restart Server / Quit。
 
 ## 运行 / Run
-
-推荐方式：构建 macOS App。
-
-```bash
-cd /Users/qlqwpy/Documents/游乐园/hermes-chat-viewer
-./scripts/build-macos-app.sh
-open "dist/Hermes Chat Viewer.app"
-```
-
-打开后菜单栏会出现 `⚕` 图标。Quit 会停止本地 viewer 服务。
-
-如果 App 打不开或服务没起来，可从菜单栏选择 `Show Logs`，日志位置：
-
-```text
-~/Library/Logs/Hermes Chat Viewer/server.log
-```
-
-也可以继续使用旧的 `.command`：
 
 macOS 下双击：
 
@@ -61,6 +42,10 @@ http://127.0.0.1:8765
 服务默认只绑定 `127.0.0.1`，只暴露已知 Hermes session 文件。它不会安装 launchd、不会创建后台常驻服务；退出按钮会调用 `/api/shutdown` 停止服务。
 
 The server binds to `127.0.0.1` by default and only exposes known Hermes session files. It does not install a background daemon; the quit button calls `/api/shutdown`.
+
+## Legacy
+
+The abandoned macOS menu-bar app wrapper is kept under `legacy/` for reference only. The supported path is the local HTML/Python viewer.
 
 ## 项目位置 / Project Location
 
